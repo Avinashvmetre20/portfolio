@@ -119,6 +119,15 @@ input, textarea {
     border-radius: 5px;
     border: 1px solid #ddd;
 }
+.c1{
+
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+}
 
 button[type="submit"] {
     padding: 10px;
