@@ -348,6 +348,51 @@
         </div>
     </footer>
 
+    <!-- AI Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot-widget">
+        <div class="chatbot-toggle" id="chatbot-toggle">
+            <i class="fas fa-robot"></i>
+            <span class="chatbot-label">Ask me about my portfolio!</span>
+        </div>
+        
+        <div class="chatbot-container" id="chatbot-container">
+            <div class="chatbot-header">
+                <div class="chatbot-title">
+                    <i class="fas fa-robot"></i>
+                    <span>Portfolio Assistant</span>
+                </div>
+                <div class="chatbot-actions">
+                    <button class="chatbot-export" id="chatbot-export" title="Export Chat Logs">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="chatbot-close" id="chatbot-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chatbot-messages" id="chatbot-messages">
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <i class="fas fa-robot"></i>
+                        <div class="message-text">
+                            Hi! I'm your portfolio assistant. Ask me anything about Avinash's projects, skills, experience, or background. I can help you learn more about his work!
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chatbot-input">
+                <input type="text" id="chatbot-input" placeholder="Ask me anything about the portfolio..." />
+                <button id="chatbot-send">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="chatbot.js"></script>
     <script src="script.js"></script>
 </body>
 

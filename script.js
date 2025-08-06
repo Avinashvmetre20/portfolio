@@ -1,6 +1,6 @@
+// Main portfolio script - imports separated functionality
 document.addEventListener('DOMContentLoaded', function() {
     // Set current year in footer
-    
     document.getElementById('year').textContent = new Date().getFullYear();
     
     // Header scroll effect
@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Photo rotation functionality
     const profilePhoto = document.getElementById('profile-photo');
     const photoCount = 2; // Update this to match the number of photos you have
     
