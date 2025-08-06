@@ -1,5 +1,5 @@
 // AI Chatbot functionality
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Chatbot DOM elements
     const chatbotToggle = document.getElementById('chatbot-toggle');
     const chatbotContainer = document.getElementById('chatbot-container');
@@ -84,29 +84,73 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Enhanced AI API Integration with two-step approach
+    // Enhanced AI API Integration with three-step approach
     const GEMINI_API_KEY = "AIzaSyCowUbrCLivE9CM_7kvrjymS59UIfStmY4";
-    
+
     async function callGeminiAI(userMessage) {
         try {
-            // Step 1: Initial API call to understand the question
-            const initialPrompt = `
-You are an AI assistant for Avinash's portfolio website. A user has asked: "${userMessage}"
+            // Step 1: Question Analysis - Understand what the user is asking
+            const analysisPrompt = `
+You are an AI assistant analyzing questions for Avinash's portfolio website. 
 
-Please analyze this question and tell me:
-1. What type of information they're looking for (project details, technology, contact, education, etc.)
-2. Which specific project(s) they might be referring to
-3. What specific details would be most relevant to answer their question
-4. If they're asking about which projects use a specific technology, identify that technology
+USER QUESTION: "${userMessage}"
 
-Respond in a structured format like:
-TYPE: [project/technology/contact/education/general]
-PROJECTS: [list relevant project names if any]
-TECHNOLOGY: [if asking about specific technology]
-DETAILS_NEEDED: [what specific information to gather]
+Please analyze this question and provide a detailed breakdown:
+
+1. **QUESTION TYPE**: What category does this question fall into?
+   - Role/Position (frontend/backend developer, what kind of developer)
+   - Project Information (specific project details, demos, GitHub links)
+   - Project Count (how many projects, total projects completed)
+   - Technology Usage (which projects use specific technologies)
+   - Skills/Expertise (what technologies, frameworks, tools)
+   - Contact Information (email, phone, social links)
+   - Education/Background (degrees, certifications, experience)
+   - General Information (about Avinash, portfolio overview)
+
+2. **KEYWORDS**: What are the main keywords in this question?
+
+3. **SPECIFIC FOCUS**: What specific information is the user looking for?
+
+4. **CONTEXT**: What additional context would help answer this question?
+
+5. **ANSWER STRUCTURE**: How should the answer be formatted?
+   - Simple text response
+   - Structured with headings
+   - List format
+   - Comparison format
+   - Contact details format
+   - Names only format
+   - Brief summary format
+
+Respond in this exact JSON format:
+{
+  "questionType": "role/position",
+  "keywords": ["frontend", "backend", "developer"],
+  "specificFocus": "whether Avinash is frontend or backend developer",
+  "context": "user wants to understand Avinash's primary role",
+  "answerStructure": "structured with headings",
+  "requiresData": ["role", "skills", "projects"],
+  "tone": "professional but friendly"
+}
             `;
 
-            const initialResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+            // const analysisResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'Authorization': `Bearer ${GEMINI_API_KEY}`
+            //     },
+            //     body: JSON.stringify({
+            //         contents: [{
+            //             parts: [{
+            //                 text: analysisPrompt
+            //             }]
+            //         }]
+            //     })
+            // });
+
+
+            const analysisResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -115,50 +159,83 @@ DETAILS_NEEDED: [what specific information to gather]
                 body: JSON.stringify({
                     contents: [{
                         parts: [{
-                            text: initialPrompt
+                            text: analysisPrompt
                         }]
                     }]
                 })
             });
 
-            if (!initialResponse.ok) {
-                throw new Error(`HTTP error! status: ${initialResponse.status}`);
+
+
+            if (!analysisResponse.ok) {
+                throw new Error(`HTTP error! status: ${analysisResponse.status}`);
             }
 
-            const initialData = await initialResponse.json();
-            const analysis = initialData.candidates[0].content.parts[0].text;
+            const analysisData = await analysisResponse.json();
+            let analysis;
 
-            // Step 2: Search through project data based on analysis
-            const relevantData = await searchProjectData(userMessage, analysis);
+            try {
+                analysis = JSON.parse(analysisData.candidates[0].content.parts[0].text);
+            } catch (error) {
+                console.error('Failed to parse analysis JSON, using fallback:', error);
+                analysis = {
+                    questionType: 'general',
+                    keywords: [],
+                    specificFocus: 'general information',
+                    context: 'user asking general question',
+                    answerStructure: 'simple text response',
+                    requiresData: ['general'],
+                    tone: 'professional but friendly'
+                };
+            }
 
-            // Step 3: Final API call with collected data for perfect answer
-            const finalPrompt = `
+            // Step 2: Search through portfolio data based on analysis
+            const relevantData = await searchPortfolioData(userMessage, analysis);
+
+            // Step 3: Generate perfect answer based on analysis and data
+            const answerPrompt = `
 You are an AI assistant for Avinash's portfolio website. 
 
-**User Question:** ${userMessage}
+**USER QUESTION:** ${userMessage}
 
-**Relevant Portfolio Data:**
+**QUESTION ANALYSIS:**
+- Type: ${analysis.questionType}
+- Keywords: ${analysis.keywords.join(', ')}
+- Specific Focus: ${analysis.specificFocus}
+- Context: ${analysis.context}
+- Answer Structure: ${analysis.answerStructure}
+- Tone: ${analysis.tone}
+
+**RELEVANT PORTFOLIO DATA:**
 ${relevantData}
 
-**Analysis of Question:** ${analysis}
+**INSTRUCTIONS FOR PERFECT ANSWER:**
+1. **Answer Structure**: Format the response according to "${analysis.answerStructure}"
+2. **Tone**: Use a "${analysis.tone}" tone
+3. **Focus**: Directly address "${analysis.specificFocus}"
+4. **Keywords**: Incorporate relevant keywords: ${analysis.keywords.join(', ')}
+5. **Data Usage**: Use only the relevant data provided above
+6. **Formatting**: 
+   - Use emojis appropriately for engagement
+   - Use headings (h3, h4) for structured responses
+   - Use bullet points for lists
+   - Use bold for emphasis
+   - Use italics for additional context
+7. **Completeness**: Ensure the answer fully addresses the user's question
+8. **Professionalism**: Keep it professional but friendly
 
-Please provide a perfect, contextual answer to the user's question using the relevant data above. 
+**RESPONSE REQUIREMENTS:**
+- Be direct and specific to what was asked
+- Use the exact data from the portfolio
+- Format according to the specified structure
+- Maintain the specified tone
+- Include relevant emojis and formatting
+- If information is missing, suggest contacting Avinash directly
 
-IMPORTANT INSTRUCTIONS:
-1. Be direct and specific to what was asked
-2. Use emojis and formatting to make responses engaging
-3. For YES/NO questions, use ✅/❌ format
-4. For technology questions, be specific about what's used
-5. For project details, provide comprehensive information
-6. For contact questions, provide all contact details
-7. For COUNT questions (how many projects use X), provide the number and list the projects
-8. Keep responses concise but informative
-9. If information is not available, suggest contacting Avinash directly
-
-Provide a helpful, professional response that directly answers the user's question.
+Generate a perfect, contextual answer that directly addresses the user's question using the provided data and analysis.
             `;
 
-            const finalResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+            const answerResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -167,20 +244,20 @@ Provide a helpful, professional response that directly answers the user's questi
                 body: JSON.stringify({
                     contents: [{
                         parts: [{
-                            text: finalPrompt
+                            text: answerPrompt
                         }]
                     }]
                 })
             });
 
-            if (!finalResponse.ok) {
-                throw new Error(`HTTP error! status: ${finalResponse.status}`);
+            if (!answerResponse.ok) {
+                throw new Error(`HTTP error! status: ${answerResponse.status}`);
             }
 
-            const finalData = await finalResponse.json();
-            
-            if (finalData.candidates && finalData.candidates[0] && finalData.candidates[0].content && finalData.candidates[0].content.parts[0]) {
-                return finalData.candidates[0].content.parts[0].text;
+            const answerData = await answerResponse.json();
+
+            if (answerData.candidates && answerData.candidates[0] && answerData.candidates[0].content && answerData.candidates[0].content.parts[0]) {
+                return answerData.candidates[0].content.parts[0].text;
             } else {
                 throw new Error('Invalid response format from AI API');
             }
@@ -191,8 +268,8 @@ Provide a helpful, professional response that directly answers the user's questi
         }
     }
 
-    // Function to search and collect relevant project data
-    async function searchProjectData(userMessage, analysis) {
+    // Function to search and collect relevant portfolio data based on analysis
+    async function searchPortfolioData(userMessage, analysis) {
         const message = userMessage.toLowerCase();
         let relevantData = '';
 
@@ -205,30 +282,60 @@ Provide a helpful, professional response that directly answers the user's questi
         // Add technical skills
         relevantData += `**Technical Skills:** ${portfolioData.skills.join(', ')}\n\n`;
 
-        // Search for relevant projects
-        for (let project of portfolioData.projects) {
-            const projectNameLower = project.name.toLowerCase();
-            const projectWords = project.name.split(' ').map(word => word.toLowerCase());
-            
-            // Check if this project is relevant to the question
-            if (message.includes(projectNameLower) || 
-                projectWords.some(word => message.includes(word)) ||
-                message.includes('chat') && project.name.includes('Chat') ||
-                message.includes('employee') && project.name.includes('Employee') ||
-                message.includes('investment') && project.name.includes('Investment') ||
-                message.includes('cart') && project.name.includes('Cart') ||
-                analysis.toLowerCase().includes(project.name.toLowerCase())) {
-                
-                relevantData += `**Project: ${project.name}**\n`;
-                relevantData += `- Description: ${project.description}\n`;
-                relevantData += `- Technologies: ${project.tech.join(', ')}\n`;
-                relevantData += `- GitHub: ${project.github}\n`;
-                relevantData += `- Live Demo: ${project.demo}\n\n`;
+        // Search for relevant projects based on analysis
+        if (analysis.requiresData.includes('projects') || analysis.questionType === 'project information' || analysis.questionType === 'project count') {
+            // Check if user wants only project names
+            const wantsNamesOnly = message.includes('name only') || message.includes('names only') ||
+                message.includes('just names') || message.includes('only names') ||
+                analysis.answerStructure === 'names only format';
+
+            // Check if user wants count information
+            const wantsCount = message.includes('how many') || message.includes('count') ||
+                message.includes('total') || analysis.questionType === 'project count';
+
+            for (let project of portfolioData.projects) {
+                const projectNameLower = project.name.toLowerCase();
+                const projectWords = project.name.split(' ').map(word => word.toLowerCase());
+
+                // Check if this project is relevant to the question
+                if (message.includes(projectNameLower) ||
+                    projectWords.some(word => message.includes(word)) ||
+                    message.includes('chat') && project.name.includes('Chat') ||
+                    message.includes('employee') && project.name.includes('Employee') ||
+                    message.includes('investment') && project.name.includes('Investment') ||
+                    message.includes('cart') && project.name.includes('Cart') ||
+                    analysis.keywords.some(keyword => project.name.toLowerCase().includes(keyword.toLowerCase())) ||
+                    analysis.keywords.some(keyword => project.tech.some(tech => tech.toLowerCase().includes(keyword.toLowerCase())))) {
+
+                    if (wantsNamesOnly) {
+                        relevantData += `**Project Name: ${project.name}**\n`;
+                    } else if (wantsCount) {
+                        relevantData += `**Project: ${project.name}**\n`;
+                    } else {
+                        relevantData += `**Project: ${project.name}**\n`;
+                        relevantData += `- Description: ${project.description}\n`;
+                        relevantData += `- Technologies: ${project.tech.join(', ')}\n`;
+                        relevantData += `- GitHub: ${project.github}\n`;
+                        relevantData += `- Live Demo: ${project.demo}\n\n`;
+                    }
+                }
+            }
+
+            // Add count information if requested
+            if (wantsCount) {
+                relevantData += `\n**TOTAL PROJECT COUNT: ${portfolioData.projects.length}**\n`;
+                relevantData += `**INSTRUCTION**: User wants to know the total number of projects completed.`;
+            }
+
+            // If user wants names only, add instruction for AI
+            if (wantsNamesOnly) {
+                relevantData += `\n**INSTRUCTION**: User wants only project names, not descriptions or details.`;
             }
         }
 
         // Add education if relevant
-        if (message.includes('education') || message.includes('degree') || message.includes('study') || analysis.toLowerCase().includes('education')) {
+        if (analysis.requiresData.includes('education') || analysis.questionType === 'education/background' ||
+            message.includes('education') || message.includes('degree') || message.includes('study')) {
             relevantData += `**Education:**\n`;
             portfolioData.education.forEach(edu => {
                 relevantData += `- ${edu.institution}: ${edu.degree} (${edu.period})\n`;
@@ -237,7 +344,8 @@ Provide a helpful, professional response that directly answers the user's questi
         }
 
         // Add certifications if relevant
-        if (message.includes('certification') || message.includes('certificate') || analysis.toLowerCase().includes('certification')) {
+        if (analysis.requiresData.includes('certifications') || analysis.questionType === 'education/background' ||
+            message.includes('certification') || message.includes('certificate')) {
             relevantData += `**Certifications:**\n`;
             portfolioData.certifications.forEach(cert => {
                 relevantData += `- ${cert.name} (${cert.year})\n`;
@@ -246,7 +354,8 @@ Provide a helpful, professional response that directly answers the user's questi
         }
 
         // Add contact information if relevant
-        if (message.includes('contact') || message.includes('email') || message.includes('phone') || analysis.toLowerCase().includes('contact')) {
+        if (analysis.requiresData.includes('contact') || analysis.questionType === 'contact information' ||
+            message.includes('contact') || message.includes('email') || message.includes('phone')) {
             relevantData += `**Contact Information:**\n`;
             relevantData += `- Email: ${portfolioData.contact.email}\n`;
             relevantData += `- Phone: ${portfolioData.contact.phone}\n`;
@@ -255,95 +364,156 @@ Provide a helpful, professional response that directly answers the user's questi
             relevantData += `- LinkedIn: ${portfolioData.contact.linkedin}\n\n`;
         }
 
+        // Add role information if relevant
+        if (analysis.requiresData.includes('role') || analysis.questionType === 'role/position' ||
+            message.includes('frontend') || message.includes('backend') || message.includes('role') ||
+            message.includes('developer') || analysis.keywords.some(keyword => ['frontend', 'backend', 'developer'].includes(keyword.toLowerCase()))) {
+            relevantData += `**Role Information:**\n`;
+            relevantData += `- Primary Role: ${portfolioData.role}\n`;
+            relevantData += `- Specialization: Backend Development\n`;
+            relevantData += `- Backend Technologies: Node.js, Express.js, MongoDB, MySQL, JWT, Socket.io, Redis\n`;
+            relevantData += `- Frontend Experience: HTML5, CSS3, JavaScript (for full-stack development)\n`;
+            relevantData += `- Focus: Building scalable backend systems and APIs\n\n`;
+        }
+
+        // Add skills information if relevant
+        if (analysis.requiresData.includes('skills') || analysis.questionType === 'skills/expertise' ||
+            message.includes('skill') || message.includes('technology') || message.includes('tech stack')) {
+            relevantData += `**Skills & Expertise:**\n`;
+            relevantData += `- Primary Skills: ${portfolioData.skills.join(', ')}\n`;
+            relevantData += `- Backend Focus: Node.js, Express.js, MongoDB, MySQL\n`;
+            relevantData += `- Frontend Experience: HTML5, CSS3, JavaScript\n`;
+            relevantData += `- Additional Tools: Git, JWT, Socket.io, Redis, Cloudinary\n\n`;
+        }
+
         return relevantData;
     }
 
     // Fallback response generator (original static logic)
     function generateFallbackResponse(userMessage) {
         const message = userMessage.toLowerCase();
-        
+
         // Greetings
         if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
             return `Hello! I'm here to help you learn more about ${portfolioData.name}'s portfolio. What would you like to know?`;
         }
-        
+
         // Technology-specific questions (which projects use X)
         if (message.includes('which') && message.includes('projects') && message.includes('use')) {
             const techKeywords = ['cloudinary', 'mongodb', 'node', 'express', 'jwt', 'socket', 'redis', 'firebase', 'html', 'css', 'javascript'];
             for (let tech of techKeywords) {
                 if (message.includes(tech)) {
-                    const projectsUsingTech = portfolioData.projects.filter(project => 
+                    const projectsUsingTech = portfolioData.projects.filter(project =>
                         project.tech.some(technology => technology.toLowerCase().includes(tech))
                     );
-                    
+
                     if (projectsUsingTech.length > 0) {
-                        let response = `🛠️ Projects using ${tech.toUpperCase()}:\n\n`;
+                        let response = `**Projects using ${tech.toUpperCase()}:**\n\n`;
                         projectsUsingTech.forEach(project => {
                             response += `• **${project.name}**\n`;
                         });
                         return response;
                     } else {
-                        return `❌ No projects use ${tech.toUpperCase()}`;
+                        return `No projects use ${tech.toUpperCase()}`;
                     }
                 }
             }
         }
-        
+
         // Count-based questions (how many projects use X)
         if ((message.includes('how many') || message.includes('in how many')) && message.includes('projects') && message.includes('use')) {
             const techKeywords = ['cloudinary', 'mongodb', 'node', 'express', 'jwt', 'socket', 'redis', 'firebase', 'html', 'css', 'javascript'];
             for (let tech of techKeywords) {
                 if (message.includes(tech)) {
-                    const projectsUsingTech = portfolioData.projects.filter(project => 
+                    const projectsUsingTech = portfolioData.projects.filter(project =>
                         project.tech.some(technology => technology.toLowerCase().includes(tech))
                     );
-                    
+
                     if (projectsUsingTech.length > 0) {
-                        let response = `📊 **${projectsUsingTech.length} project${projectsUsingTech.length > 1 ? 's' : ''}** use ${tech.toUpperCase()}:\n\n`;
+                        let response = `**${projectsUsingTech.length} project${projectsUsingTech.length > 1 ? 's' : ''}** use ${tech.toUpperCase()}:\n\n`;
                         projectsUsingTech.forEach(project => {
                             response += `• **${project.name}**\n`;
                         });
                         return response;
                     } else {
-                        return `❌ **0 projects** use ${tech.toUpperCase()}`;
+                        return `**0 projects** use ${tech.toUpperCase()}`;
                     }
                 }
             }
         }
-        
+
         // About Avinash
         if (message.includes('who') && message.includes('avinash') || message.includes('about') && message.includes('avinash')) {
             return `${portfolioData.name} is a ${portfolioData.role} with expertise in backend development. He's proficient in JavaScript, Java, Node.js, and Generative AI, with a strong foundation in backend development. He's known for problem-solving skills and thrives in collaborative environments.`;
         }
-        
+
+        // Handle questions about Avinash's role (frontend vs backend)
+        if (message.includes('frontend') || message.includes('front-end') || message.includes('front end')) {
+            if (message.includes('backend') || message.includes('back-end') || message.includes('back end')) {
+                // User is asking about both frontend and backend
+                return `**Avinash is a Backend Developer**\n\nWhile he primarily specializes in backend development using Node.js, Express.js, MongoDB, and other server-side technologies, he also has experience with frontend technologies like HTML5, CSS3, and JavaScript for full-stack development.\n\nHis main focus is on building robust backend systems and APIs.`;
+            } else {
+                // User is asking specifically about frontend
+                return `**Avinash is NOT primarily a Frontend Developer**\n\nHe is a **Backend Developer** who specializes in server-side development using Node.js, Express.js, MongoDB, and other backend technologies. While he has some frontend experience (HTML5, CSS3, JavaScript), his expertise lies in building robust backend systems and APIs.`;
+            }
+        }
+
+        // Handle specific role questions with "or" pattern
+        if ((message.includes('frontend') || message.includes('front-end') || message.includes('front end')) &&
+            (message.includes('backend') || message.includes('back-end') || message.includes('back end')) &&
+            message.includes('or')) {
+            return `**Avinash is a Backend Developer**\n\nHe specializes in server-side development using:\n• Node.js & Express.js\n• MongoDB & MySQL\n• JWT Authentication\n• Socket.io for real-time features\n• Redis for caching\n• RESTful APIs\n\nWhile he has some frontend experience (HTML5, CSS3, JavaScript), his primary focus is on building robust backend systems and APIs.`;
+        }
+
+        // Handle general role questions
+        if (message.includes('what kind') && message.includes('developer') ||
+            message.includes('type of') && message.includes('developer') ||
+            message.includes('is he') && message.includes('developer') ||
+            message.includes('what does') && message.includes('do') ||
+            message.includes('what is') && message.includes('role')) {
+            return `**Avinash is a Backend Developer**\n\nHe specializes in:\n• Server-side development with Node.js & Express.js\n• Database management (MongoDB, MySQL)\n• API development and RESTful services\n• Authentication systems (JWT)\n• Real-time features (Socket.io)\n• Performance optimization (Redis caching)\n\nHis expertise focuses on building scalable, secure backend systems that power web applications.`;
+        }
+
+        // Handle specific questions about Avinash's role
+        if (message.includes('avinash') && (message.includes('frontend') || message.includes('backend') || message.includes('developer'))) {
+            return `**Avinash is a Backend Developer**\n\nHe specializes in server-side development and has expertise in:\n• Node.js & Express.js frameworks\n• Database systems (MongoDB, MySQL)\n• API development and RESTful services\n• Authentication & security (JWT)\n• Real-time communication (Socket.io)\n• Performance optimization (Redis)\n\nWhile he has some frontend experience, his primary focus is on building robust, scalable backend systems.`;
+        }
+
+        if (message.includes('backend') || message.includes('back-end') || message.includes('back end')) {
+            if (!message.includes('frontend') && !message.includes('front-end') && !message.includes('front end')) {
+                // User is asking specifically about backend
+                return `**Avinash is a Backend Developer**\n\nHe specializes in server-side development using:\n• Node.js & Express.js\n• MongoDB & MySQL\n• JWT Authentication\n• Socket.io for real-time features\n• Redis for caching\n• RESTful APIs\n\nHis projects focus on building scalable backend systems and APIs.`;
+            }
+        }
+
         // Skills
         if (message.includes('skill') || message.includes('technology') || message.includes('tech stack')) {
             return `${portfolioData.name}'s technical skills include: ${portfolioData.skills.join(', ')}. He specializes in backend development with Node.js, Express.js, and various databases like MongoDB and MySQL.`;
         }
-        
+
         // Enhanced project search with flexible question understanding
         for (let project of portfolioData.projects) {
             const projectNameLower = project.name.toLowerCase();
             const projectWords = project.name.split(' ').map(word => word.toLowerCase());
-            
+
             // Check for specific project mentions (more flexible matching)
-            if (message.includes(projectNameLower) || 
+            if (message.includes(projectNameLower) ||
                 projectWords.some(word => message.includes(word)) ||
                 message.includes('chat') && project.name.includes('Chat') ||
                 message.includes('employee') && project.name.includes('Employee') ||
                 message.includes('investment') && project.name.includes('Investment') ||
                 message.includes('cart') && project.name.includes('Cart')) {
-                
+
                 // If asking for demo link specifically
                 if (message.includes('demo') || message.includes('live') || message.includes('link') || message.includes('show me') || message.includes('where can i')) {
-                    return `🚀 Live Demo: ${project.demo}`;
+                    return `**Live Demo:** ${project.demo}`;
                 }
-                
+
                 // If asking for GitHub link specifically
                 if (message.includes('github') || message.includes('code') || message.includes('source') || message.includes('repository')) {
-                    return `📂 GitHub: ${project.github}`;
+                    return `**GitHub:** ${project.github}`;
                 }
-                
+
                 // If asking about technologies used in the project
                 if (message.includes('technology') || message.includes('tech') || message.includes('used') || message.includes('technologies') || message.includes('stack') || message.includes('tools') || message.includes('built with') || message.includes('made with')) {
                     // Check if user is asking for yes/no answer
@@ -351,64 +521,74 @@ Provide a helpful, professional response that directly answers the user's questi
                         // Check for specific technology mentions
                         if (message.includes('html')) {
                             const hasHtml = project.tech.some(tech => tech.toLowerCase().includes('html'));
-                            return hasHtml ? `✅ YES - HTML is used in ${project.name}` : `❌ NO - HTML is not used in ${project.name}`;
+                            return hasHtml ? `**YES** - HTML is used in ${project.name}` : `**NO** - HTML is not used in ${project.name}`;
                         }
                         if (message.includes('javascript')) {
                             const hasJs = project.tech.some(tech => tech.toLowerCase().includes('javascript'));
-                            return hasJs ? `✅ YES - JavaScript is used in ${project.name}` : `❌ NO - JavaScript is not used in ${project.name}`;
+                            return hasJs ? `**YES** - JavaScript is used in ${project.name}` : `**NO** - JavaScript is not used in ${project.name}`;
                         }
                         if (message.includes('node')) {
                             const hasNode = project.tech.some(tech => tech.toLowerCase().includes('node'));
-                            return hasNode ? `✅ YES - Node.js is used in ${project.name}` : `❌ NO - Node.js is not used in ${project.name}`;
+                            return hasNode ? `**YES** - Node.js is used in ${project.name}` : `**NO** - Node.js is not used in ${project.name}`;
                         }
                         if (message.includes('mongodb')) {
                             const hasMongo = project.tech.some(tech => tech.toLowerCase().includes('mongodb'));
-                            return hasMongo ? `✅ YES - MongoDB is used in ${project.name}` : `❌ NO - MongoDB is not used in ${project.name}`;
+                            return hasMongo ? `**YES** - MongoDB is used in ${project.name}` : `**NO** - MongoDB is not used in ${project.name}`;
                         }
                         if (message.includes('express')) {
                             const hasExpress = project.tech.some(tech => tech.toLowerCase().includes('express'));
-                            return hasExpress ? `✅ YES - Express.js is used in ${project.name}` : `❌ NO - Express.js is not used in ${project.name}`;
+                            return hasExpress ? `**YES** - Express.js is used in ${project.name}` : `**NO** - Express.js is not used in ${project.name}`;
                         }
                         if (message.includes('jwt')) {
                             const hasJwt = project.tech.some(tech => tech.toLowerCase().includes('jwt'));
-                            return hasJwt ? `✅ YES - JWT is used in ${project.name}` : `❌ NO - JWT is not used in ${project.name}`;
+                            return hasJwt ? `**YES** - JWT is used in ${project.name}` : `**NO** - JWT is not used in ${project.name}`;
                         }
                         if (message.includes('cloudinary')) {
                             const hasCloudinary = project.tech.some(tech => tech.toLowerCase().includes('cloudinary'));
-                            return hasCloudinary ? `✅ YES - Cloudinary is used in ${project.name}` : `❌ NO - Cloudinary is not used in ${project.name}`;
+                            return hasCloudinary ? `**YES** - Cloudinary is used in ${project.name}` : `**NO** - Cloudinary is not used in ${project.name}`;
                         }
                         if (message.includes('socket')) {
                             const hasSocket = project.tech.some(tech => tech.toLowerCase().includes('socket'));
-                            return hasSocket ? `✅ YES - Socket.io is used in ${project.name}` : `❌ NO - Socket.io is not used in ${project.name}`;
+                            return hasSocket ? `**YES** - Socket.io is used in ${project.name}` : `**NO** - Socket.io is not used in ${project.name}`;
                         }
                         if (message.includes('redis')) {
                             const hasRedis = project.tech.some(tech => tech.toLowerCase().includes('redis'));
-                            return hasRedis ? `✅ YES - Redis is used in ${project.name}` : `❌ NO - Redis is not used in ${project.name}`;
+                            return hasRedis ? `**YES** - Redis is used in ${project.name}` : `**NO** - Redis is not used in ${project.name}`;
                         }
                         if (message.includes('firebase')) {
                             const hasFirebase = project.tech.some(tech => tech.toLowerCase().includes('firebase'));
-                            return hasFirebase ? `✅ YES - Firebase is used in ${project.name}` : `❌ NO - Firebase is not used in ${project.name}`;
+                            return hasFirebase ? `**YES** - Firebase is used in ${project.name}` : `**NO** - Firebase is not used in ${project.name}`;
                         }
                         if (message.includes('css')) {
                             const hasCss = project.tech.some(tech => tech.toLowerCase().includes('css'));
-                            return hasCss ? `✅ YES - CSS is used in ${project.name}` : `❌ NO - CSS is not used in ${project.name}`;
+                            return hasCss ? `**YES** - CSS is used in ${project.name}` : `**NO** - CSS is not used in ${project.name}`;
                         }
                     }
-                    return `🛠️ Technologies used in ${project.name}: ${project.tech.join(', ')}`;
+                    return `**Technologies used in ${project.name}:** ${project.tech.join(', ')}`;
                 }
-                
+
                 // If asking about the USE or PURPOSE of the project
                 if (message.includes('use') || message.includes('purpose') || message.includes('what') || message.includes('why') || message.includes('benefit') || message.includes('application') || message.includes('how does') || message.includes('what does') || message.includes('explain')) {
-                    return `💡 ${project.name} is used for: ${project.description}`;
+                    return `**${project.name}** is used for: ${project.description}`;
                 }
-                
+
                 // If asking for project details
-                return `**${project.name}**: ${project.description}\n\nTechnologies used: ${project.tech.join(', ')}\n\n📂 GitHub: ${project.github}\n🚀 Live Demo: ${project.demo}`;
+                return `**${project.name}**: ${project.description}\n\nTechnologies used: ${project.tech.join(', ')}\n\n**GitHub:** ${project.github}\n**Live Demo:** ${project.demo}`;
             }
         }
-        
+
         // Projects (general)
         if (message.includes('project') || message.includes('work') || message.includes('portfolio') || message.includes('what projects') || message.includes('show projects')) {
+            // Check if user wants only project names
+            if (message.includes('name only') || message.includes('names only') || message.includes('just names') || message.includes('only names')) {
+                let response = `**${portfolioData.name}'s Projects:**\n\n`;
+                portfolioData.projects.forEach((project, index) => {
+                    response += `${index + 1}. **${project.name}**\n`;
+                });
+                return response;
+            }
+
+            // Full project details
             let response = `${portfolioData.name} has worked on several impressive projects:\n\n`;
             portfolioData.projects.forEach((project, index) => {
                 response += `${index + 1}. **${project.name}**: ${project.description}\n`;
@@ -416,7 +596,49 @@ Provide a helpful, professional response that directly answers the user's questi
             });
             return response;
         }
-        
+
+        // Specific handler for "projects name only" requests
+        if (message.includes('projects name only') || message.includes('project names only') ||
+            message.includes('just project names') || message.includes('only project names') ||
+            message.includes('list project names') || message.includes('project names list')) {
+            let response = `**${portfolioData.name}'s Project Names:**\n\n`;
+            portfolioData.projects.forEach((project, index) => {
+                response += `${index + 1}. **${project.name}**\n`;
+            });
+            return response;
+        }
+
+        // Handle project count questions
+        if (message.includes('how many') && (message.includes('project') || message.includes('projects')) &&
+            (message.includes('completed') || message.includes('done') || message.includes('finished') ||
+                message.includes('has') || message.includes('had') || message.includes('total'))) {
+            const projectCount = portfolioData.projects.length;
+            let response = `**${portfolioData.name} has completed ${projectCount} project${projectCount > 1 ? 's' : ''}**\n\n`;
+
+            // Add project names for context
+            response += `**Projects:**\n`;
+            portfolioData.projects.forEach((project, index) => {
+                response += `${index + 1}. **${project.name}**\n`;
+            });
+
+            return response;
+        }
+
+        // Handle general count questions about projects
+        if ((message.includes('how many') || message.includes('count') || message.includes('total')) &&
+            (message.includes('project') || message.includes('projects'))) {
+            const projectCount = portfolioData.projects.length;
+            let response = `**${portfolioData.name} has ${projectCount} project${projectCount > 1 ? 's' : ''}**\n\n`;
+
+            // Add project names for context
+            response += `**Project List:**\n`;
+            portfolioData.projects.forEach((project, index) => {
+                response += `${index + 1}. **${project.name}**\n`;
+            });
+
+            return response;
+        }
+
         // Education
         if (message.includes('education') || message.includes('degree') || message.includes('study') || message.includes('where did') || message.includes('university') || message.includes('college')) {
             let response = `${portfolioData.name}'s education background:\n\n`;
@@ -425,17 +647,17 @@ Provide a helpful, professional response that directly answers the user's questi
             });
             return response;
         }
-        
+
         // Contact information
         if (message.includes('contact') || message.includes('email') || message.includes('phone') || message.includes('reach') || message.includes('how to contact') || message.includes('get in touch')) {
-            return `You can reach ${portfolioData.name} at:\n\n📧 Email: ${portfolioData.contact.email}\n📱 Phone: ${portfolioData.contact.phone}\n📍 Location: ${portfolioData.contact.location}\n\nSocial Links:\n🔗 GitHub: ${portfolioData.contact.github}\n🔗 LinkedIn: ${portfolioData.contact.linkedin}`;
+            return `You can reach ${portfolioData.name} at:\n\n**Email:** ${portfolioData.contact.email}\n**Phone:** ${portfolioData.contact.phone}\n**Location:** ${portfolioData.contact.location}\n\n**Social Links:**\n**GitHub:** ${portfolioData.contact.github}\n**LinkedIn:** ${portfolioData.contact.linkedin}`;
         }
-        
+
         // Experience
         if (message.includes('experience') || message.includes('background') || message.includes('career') || message.includes('work experience')) {
             return `${portfolioData.name} is a dynamic software developer with expertise in backend development using JavaScript, Node.js, and modern frameworks. He has proven ability to develop secure, scalable applications with features like role-based access control, real-time data integration, and performance optimization. He's a quick learner with demonstrated ability to rapidly acquire new technologies.`;
         }
-        
+
         // Certifications
         if (message.includes('certification') || message.includes('certificate') || message.includes('certified')) {
             let response = `${portfolioData.name} has the following certifications:\n\n`;
@@ -444,34 +666,34 @@ Provide a helpful, professional response that directly answers the user's questi
             });
             return response;
         }
-        
+
         // Unknown queries - redirect to contact
-        return `I don't have specific information about that. For detailed questions or inquiries, please contact ${portfolioData.name} directly:\n\n📧 Email: ${portfolioData.contact.email}\n📱 Phone: ${portfolioData.contact.phone}\n\nHe'll be happy to help you with any specific questions!`;
+        return `I don't have specific information about that. For detailed questions or inquiries, please contact ${portfolioData.name} directly:\n\n**Email:** ${portfolioData.contact.email}\n**Phone:** ${portfolioData.contact.phone}\n\nHe'll be happy to help you with any specific questions!`;
     }
 
     // Add message to chat
     function addMessage(content, isUser = false, isAI = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        
+
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        
+
         if (!isUser) {
             const icon = document.createElement('i');
             icon.className = isAI ? 'fas fa-brain' : 'fas fa-robot';
             icon.title = isAI ? 'AI Powered Response' : 'Bot Response';
             messageContent.appendChild(icon);
         }
-        
+
         const messageText = document.createElement('div');
         messageText.className = 'message-text';
         messageText.innerHTML = content;
-        
+
         messageContent.appendChild(messageText);
         messageDiv.appendChild(messageContent);
         chatbotMessages.appendChild(messageDiv);
-        
+
         // Scroll to bottom
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
@@ -481,27 +703,27 @@ Provide a helpful, professional response that directly answers the user's questi
         const typingDiv = document.createElement('div');
         typingDiv.className = 'message bot-message typing-indicator-message';
         typingDiv.id = 'typing-indicator';
-        
+
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        
+
         const icon = document.createElement('i');
         icon.className = 'fas fa-robot';
         messageContent.appendChild(icon);
-        
+
         const typingIndicator = document.createElement('div');
         typingIndicator.className = 'typing-indicator';
-        
+
         for (let i = 0; i < 3; i++) {
             const dot = document.createElement('div');
             dot.className = 'typing-dot';
             typingIndicator.appendChild(dot);
         }
-        
+
         messageContent.appendChild(typingIndicator);
         typingDiv.appendChild(messageContent);
         chatbotMessages.appendChild(typingDiv);
-        
+
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
 
@@ -517,18 +739,18 @@ Provide a helpful, professional response that directly answers the user's questi
     async function handleUserInput() {
         const message = chatbotInput.value.trim();
         if (message === '') return;
-        
+
         // Add user message
         addMessage(message, true);
         chatbotInput.value = '';
-        
+
         // Show typing indicator
         showTypingIndicator();
-        
+
         const startTime = Date.now();
         let response = '';
         let responseType = 'fallback';
-        
+
         try {
             // Try AI API first
             response = await callGeminiAI(message);
@@ -545,20 +767,20 @@ Provide a helpful, professional response that directly answers the user's questi
                 addMessage(response, false, false); // Pass isAI as false for fallback response
             }, 1000);
         }
-        
+
         const responseTime = Date.now() - startTime;
-        
+
         // Log the interaction
         logInteraction(message, response, responseType, responseTime);
     }
-    
+
     // Function to log chatbot interactions
     async function logInteraction(userQuestion, botResponse, responseType, responseTime) {
         try {
             const timestamp = new Date().toISOString();
             const date = timestamp.split('T')[0];
             const time = timestamp.split('T')[1].split('.')[0];
-            
+
             const interaction = {
                 id: Date.now().toString(),
                 timestamp: timestamp,
@@ -570,17 +792,17 @@ Provide a helpful, professional response that directly answers the user's questi
                 response_time_ms: responseTime,
                 user_session_id: getSessionId()
             };
-            
+
             // Get existing logs from localStorage or create new
             let logs = { chatbot_interactions: [], metadata: {} };
             const existingLogs = localStorage.getItem('chatbot_logs');
             if (existingLogs) {
                 logs = JSON.parse(existingLogs);
             }
-            
+
             // Add new interaction
             logs.chatbot_interactions.push(interaction);
-            
+
             // Update metadata
             logs.metadata = {
                 total_interactions: logs.chatbot_interactions.length,
@@ -595,21 +817,21 @@ Provide a helpful, professional response that directly answers the user's questi
                 file_updated: new Date().toISOString(),
                 version: "1.0"
             };
-            
+
             // Store in localStorage
             localStorage.setItem('chatbot_logs', JSON.stringify(logs));
-            
+
             console.log('Chatbot interaction logged to localStorage:', interaction);
-            
+
             // Save to file immediately after every interaction
             console.log('Saving conversation to file immediately...');
             await saveConversationToFile(interaction);
-            
+
         } catch (error) {
             console.error('Error logging interaction:', error);
         }
     }
-    
+
     // Function to get session ID
     function getSessionId() {
         let sessionId = localStorage.getItem('chatbot_session_id');
@@ -619,7 +841,7 @@ Provide a helpful, professional response that directly answers the user's questi
         }
         return sessionId;
     }
-    
+
     // Function to analyze most common questions
     function getMostCommonQuestions(interactions) {
         const questionTypes = interactions.map(interaction => {
@@ -632,12 +854,12 @@ Provide a helpful, professional response that directly answers the user's questi
             if (question.includes('demo') || question.includes('link')) return 'demo links';
             return 'general inquiry';
         });
-        
+
         const counts = {};
         questionTypes.forEach(type => {
             counts[type] = (counts[type] || 0) + 1;
         });
-        
+
         return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
     }
 
@@ -646,7 +868,7 @@ Provide a helpful, professional response that directly answers the user's questi
         try {
             // Get existing conversations from localStorage
             let allConversations = JSON.parse(localStorage.getItem('all_conversations') || '{"conversations": [], "metadata": {}}');
-            
+
             // Add new conversation
             allConversations.conversations.push({
                 id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
@@ -657,7 +879,7 @@ Provide a helpful, professional response that directly answers the user's questi
                 response_type: newInteraction.response_type,
                 response_time_ms: newInteraction.response_time_ms
             });
-            
+
             // Update metadata
             allConversations.metadata = {
                 total_conversations: allConversations.conversations.length,
@@ -666,12 +888,12 @@ Provide a helpful, professional response that directly answers the user's questi
                 last_conversation: newInteraction.timestamp,
                 file_updated: new Date().toISOString()
             };
-            
+
             // Save to localStorage
             localStorage.setItem('all_conversations', JSON.stringify(allConversations));
-            
+
             console.log('Conversation saved to localStorage. Total conversations:', allConversations.conversations.length);
-            
+
         } catch (error) {
             console.error('Error saving conversation to localStorage:', error);
         }
@@ -688,7 +910,7 @@ Provide a helpful, professional response that directly answers the user's questi
             }
 
             const localStorageLogs = JSON.parse(localStorageData);
-            
+
             // Read existing file data
             let existingLogs = { chatbot_interactions: [], metadata: {} };
             try {
@@ -702,7 +924,7 @@ Provide a helpful, professional response that directly answers the user's questi
 
             // Merge localStorage data with existing file data
             const mergedLogs = mergeChatbotLogs(existingLogs, localStorageLogs);
-            
+
             // Update metadata
             mergedLogs.metadata = {
                 total_interactions: mergedLogs.chatbot_interactions.length,
@@ -721,7 +943,7 @@ Provide a helpful, professional response that directly answers the user's questi
             // Save to file using a server endpoint (in a real application)
             // For now, we'll log the data that would be saved
             console.log('Saving merged chatbot logs to file:', mergedLogs);
-            
+
             // In a real application, you would send this data to a server endpoint
             // await fetch('/api/save-chatbot-logs', {
             //     method: 'POST',
@@ -731,11 +953,11 @@ Provide a helpful, professional response that directly answers the user's questi
 
             // For demonstration, we'll create a downloadable JSON file
             downloadJSONFile(mergedLogs, 'chatbot_logs_updated.json');
-            
+
             // Clear localStorage after successful save
             localStorage.removeItem('chatbot_logs');
             console.log('Chatbot logs saved to file and localStorage cleared');
-            
+
         } catch (error) {
             console.error('Error saving localStorage data to file:', error);
         }
@@ -744,7 +966,7 @@ Provide a helpful, professional response that directly answers the user's questi
     // Function to merge chatbot logs from different sources
     function mergeChatbotLogs(existingLogs, newLogs) {
         const mergedInteractions = [...existingLogs.chatbot_interactions];
-        
+
         // Add new interactions, avoiding duplicates based on id
         newLogs.chatbot_interactions.forEach(newInteraction => {
             const existingIndex = mergedInteractions.findIndex(existing => existing.id === newInteraction.id);
@@ -772,7 +994,7 @@ Provide a helpful, professional response that directly answers the user's questi
         const dataStr = JSON.stringify(data, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
-        
+
         const link = document.createElement('a');
         link.href = url;
         link.download = filename;
@@ -824,7 +1046,7 @@ Provide a helpful, professional response that directly answers the user's questi
                 const dataStr = JSON.stringify(data, null, 2);
                 const dataBlob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(dataBlob);
-                
+
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = 'all_conversations.json';
@@ -832,7 +1054,7 @@ Provide a helpful, professional response that directly answers the user's questi
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-                
+
                 console.log('All conversations exported successfully');
                 return true;
             } else {
@@ -890,25 +1112,25 @@ Provide a helpful, professional response that directly answers the user's questi
             try {
                 chatbotExport.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 chatbotExport.disabled = true;
-                
+
                 // Export all conversations from localStorage
                 const success = exportAllConversations();
-                
+
                 if (success) {
-                    addMessage('✅ All conversations exported successfully! Check your downloads folder for the JSON file.', false, false);
+                    addMessage('All conversations exported successfully! Check your downloads folder for the JSON file.', false, false);
                 } else {
-                    addMessage('ℹ️ No conversations found to export.', false, false);
+                    addMessage('No conversations found to export.', false, false);
                 }
-                
+
                 setTimeout(() => {
                     chatbotExport.innerHTML = '<i class="fas fa-download"></i>';
                     chatbotExport.disabled = false;
                 }, 2000);
-                
+
             } catch (error) {
                 console.error('Export error:', error);
-                addMessage('❌ Error exporting conversations. Please try again.', false, false);
-                
+                addMessage('Error exporting conversations. Please try again.', false, false);
+
                 chatbotExport.innerHTML = '<i class="fas fa-download"></i>';
                 chatbotExport.disabled = false;
             }
